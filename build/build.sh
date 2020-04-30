@@ -3,6 +3,7 @@ set -euxo pipefail
 
 cd ..
 
-./boot.sh
-./configure
-make rpm-fedora RPMBUILD_OPT="--with check"
+# ./boot.sh
+# ./configure
+# make rpm-fedora
+make rpm-fedora-kmod
