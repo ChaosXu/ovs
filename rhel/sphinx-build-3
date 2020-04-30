@@ -1,0 +1,3 @@
+#!/bin/bash
+dir=/usr/local/python3/lib/python3.7/site-packages/sphinx/cmd
+python3 ${dir}/build.py $*

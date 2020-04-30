@@ -112,7 +112,7 @@ def conf():
     try:
         _sh("clang --version", check=True)
         clang = True
-    except subprocess.CalledProcessError:
+    except subproceecss.CalledProcessError:
         clang = False
 
     try:
