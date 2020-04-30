@@ -5,7 +5,7 @@ COPY ovs.spec ovs.spec
 RUN  yum -y install epel-release \
     && yum -y install deltarpm \
     && yum -y install @'Development Tools' \
-    && yum -y install rpm-build yum-utils \
+    && yum -y install rpm-build yum-uils \
     && yum-builddep -y ovs.spec
 # && yum -y install make gcc clang openssl-devel libcap-ng-devel autoconf automake libtool \
 # kernel-devel kernel-debug-devel \
@@ -37,3 +37,4 @@ RUN  yum -y install epel-release \
 # && ln -st /usr/bin ../rhel/sphinx-build-3
 
 CMD ["/bin/bash"]
+
