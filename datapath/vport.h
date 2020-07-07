@@ -61,13 +61,15 @@ u32 ovs_vport_find_upcall_portid(const struct vport *, struct sk_buff *);
  * @ids: Array storing the Netlink socket pids to be used for packets received
  * on this port that miss the flow table.
  */
-struct vport_portids {
+struct vport_portids
+{
 	struct reciprocal_value rn_ids;
 	struct rcu_head rcu;
 	u32 n_ids;
 	u32 ids[];
 };
 
+//xj:ovs vport
 /**
  * struct vport - one port within a datapath
  * @dev: Pointer to net_device.
@@ -80,9 +82,10 @@ struct vport_portids {
  * @detach_list: list used for detaching vport in net-exit call.
  * @rcu: RCU callback head for deferred destruction.
  */
-struct vport {
+struct vport
+{
 	struct net_device *dev;
-	struct datapath	*dp;
+	struct datapath *dp;
 	struct vport_portids __rcu *upcall_portids;
 	u16 port_no;
 
@@ -94,6 +97,7 @@ struct vport {
 	struct rcu_head rcu;
 };
 
+//xj:vport创建参数
 /**
  * struct vport_parms - parameters for creating a new vport
  *
@@ -104,7 +108,8 @@ struct vport {
  * @dp: New vport's datapath.
  * @port_no: New vport's port number.
  */
-struct vport_parms {
+struct vport_parms
+{
 	const char *name;
 	enum ovs_vport_type type;
 	struct nlattr *options;
@@ -115,6 +120,7 @@ struct vport_parms {
 	struct nlattr *upcall_portids;
 };
 
+//xj:具体类型的vport的操作
 /**
  * struct vport_ops - definition of a type of virtual port
  *
@@ -131,26 +137,27 @@ struct vport_parms {
  * @send: Send a packet on the device.
  * zero for dropped packets or negative for error.
  */
-struct vport_ops {
+struct vport_ops
+{
 	enum ovs_vport_type type;
 
 	/* Called with ovs_mutex. */
-	struct vport *(*create)(const struct vport_parms *);
-	void (*destroy)(struct vport *);
+	struct vport *(*create)(const struct vport_parms *); //xj:创建
+	void (*destroy)(struct vport *);					 //xj:删除
 
 	int (*set_options)(struct vport *, struct nlattr *);
 	int (*get_options)(const struct vport *, struct sk_buff *);
 
-	netdev_tx_t (*send)(struct sk_buff *skb);
+	netdev_tx_t (*send)(struct sk_buff *skb); //xj:发送
 #ifndef USE_UPSTREAM_TUNNEL
-	int  (*fill_metadata_dst)(struct net_device *dev, struct sk_buff *skb);
+	int (*fill_metadata_dst)(struct net_device *dev, struct sk_buff *skb);
 #endif
 	struct module *owner;
 	struct list_head list;
 };
 
 struct vport *ovs_vport_alloc(int priv_size, const struct vport_ops *,
-			      const struct vport_parms *);
+							  const struct vport_parms *);
 void ovs_vport_free(struct vport *);
 
 #define VPORT_ALIGN 8
@@ -185,7 +192,7 @@ static inline struct vport *vport_from_priv(void *priv)
 }
 
 int ovs_vport_receive(struct vport *, struct sk_buff *,
-		      const struct ip_tunnel_info *);
+					  const struct ip_tunnel_info *);
 
 static inline const char *ovs_vport_name(struct vport *vport)
 {
@@ -193,10 +200,10 @@ static inline const char *ovs_vport_name(struct vport *vport)
 }
 
 int __ovs_vport_ops_register(struct vport_ops *ops);
-#define ovs_vport_ops_register(ops)		\
-	({					\
-		(ops)->owner = THIS_MODULE;	\
-		__ovs_vport_ops_register(ops);	\
+#define ovs_vport_ops_register(ops)    \
+	({                                 \
+		(ops)->owner = THIS_MODULE;    \
+		__ovs_vport_ops_register(ops); \
 	})
 
 void ovs_vport_ops_unregister(struct vport_ops *ops);

@@ -49,6 +49,7 @@ static bool compat_ip6_tunnel_loaded = false;
 static struct hlist_head *dev_table;
 #define VPORT_HASH_BUCKETS 1024
 
+//xj:初始化 vport子系统
 /**
  *	ovs_vport_init - initialize vport subsystem
  *
@@ -59,7 +60,7 @@ int ovs_vport_init(void)
 	int err;
 
 	dev_table = kcalloc(VPORT_HASH_BUCKETS, sizeof(struct hlist_head),
-			    GFP_KERNEL);
+						GFP_KERNEL);
 	if (!dev_table)
 		return -ENOMEM;
 
@@ -67,25 +68,33 @@ int ovs_vport_init(void)
 	if (err)
 		goto err_lisp;
 	err = gre_init();
-	if (err && err != -EEXIST) {
+	if (err && err != -EEXIST)
+	{
 		goto err_gre;
-	} else {
-		if (err == -EEXIST) {
-			pr_warn("Cannot take GRE protocol rx entry"\
-				"- The GRE/ERSPAN rx feature not supported\n");
+	}
+	else
+	{
+		if (err == -EEXIST)
+		{
+			pr_warn("Cannot take GRE protocol rx entry"
+					"- The GRE/ERSPAN rx feature not supported\n");
 			/* continue GRE tx */
 		}
 
 		err = ipgre_init();
-		if (err && err != -EEXIST) 
+		if (err && err != -EEXIST)
 			goto err_ipgre;
 		compat_gre_loaded = true;
 	}
 	err = ip6gre_init();
-	if (err && err != -EEXIST) {
+	if (err && err != -EEXIST)
+	{
 		goto err_ip6gre;
-	} else {
-		if (err == -EEXIST) {
+	}
+	else
+	{
+		if (err == -EEXIST)
+		{
 			pr_warn("IPv6 GRE/ERSPAN Rx mode is not supported\n");
 			goto skip_ip6_tunnel_init;
 		}
@@ -136,7 +145,8 @@ err_lisp:
  */
 void ovs_vport_exit(void)
 {
-	if (compat_gre_loaded) {
+	if (compat_gre_loaded)
+	{
 		gre_exit();
 		ipgre_fini();
 	}
@@ -152,20 +162,19 @@ void ovs_vport_exit(void)
 
 static struct hlist_head *hash_bucket(const struct net *net, const char *name)
 {
-	unsigned int hash = jhash(name, strlen(name), (unsigned long) net);
+	unsigned int hash = jhash(name, strlen(name), (unsigned long)net);
 	return &dev_table[hash & (VPORT_HASH_BUCKETS - 1)];
 }
 
+//xj:注册vport_ops
 int __ovs_vport_ops_register(struct vport_ops *ops)
 {
 	int err = -EEXIST;
 	struct vport_ops *o;
 
 	ovs_lock();
-	list_for_each_entry(o, &vport_ops_list, list)
-		if (ops->type == o->type)
-			goto errout;
-
+	list_for_each_entry(o, &vport_ops_list, list) if (ops->type == o->type) goto errout;
+	//xj:添加 vport_ops到vport_ops_list
 	list_add_tail(&ops->list, &vport_ops_list);
 	err = 0;
 errout:
@@ -194,10 +203,8 @@ struct vport *ovs_vport_locate(const struct net *net, const char *name)
 	struct hlist_head *bucket = hash_bucket(net, name);
 	struct vport *vport;
 
-	hlist_for_each_entry_rcu(vport, bucket, hash_node)
-		if (!strcmp(name, ovs_vport_name(vport)) &&
-		    net_eq(ovs_dp_get_net(vport->dp), net))
-			return vport;
+	hlist_for_each_entry_rcu(vport, bucket, hash_node) if (!strcmp(name, ovs_vport_name(vport)) &&
+														   net_eq(ovs_dp_get_net(vport->dp), net)) return vport;
 
 	return NULL;
 }
@@ -214,13 +221,14 @@ struct vport *ovs_vport_locate(const struct net *net, const char *name)
  * vport_free().
  */
 struct vport *ovs_vport_alloc(int priv_size, const struct vport_ops *ops,
-			  const struct vport_parms *parms)
+							  const struct vport_parms *parms)
 {
 	struct vport *vport;
 	size_t alloc_size;
 
 	alloc_size = sizeof(struct vport);
-	if (priv_size) {
+	if (priv_size)
+	{
 		alloc_size = ALIGN(alloc_size, VPORT_ALIGN);
 		alloc_size += priv_size;
 	}
@@ -228,13 +236,14 @@ struct vport *ovs_vport_alloc(int priv_size, const struct vport_ops *ops,
 	vport = kzalloc(alloc_size, GFP_KERNEL);
 	if (!vport)
 		return ERR_PTR(-ENOMEM);
-
+	//xj:设置datapath，port_no，操作
 	vport->dp = parms->dp;
 	vport->port_no = parms->port_no;
 	vport->ops = ops;
 	INIT_HLIST_NODE(&vport->dp_hash_node);
 
-	if (ovs_vport_set_upcall_portids(vport, parms->upcall_portids)) {
+	if (ovs_vport_set_upcall_portids(vport, parms->upcall_portids))
+	{
 		kfree(vport);
 		return ERR_PTR(-EINVAL);
 	}
@@ -267,9 +276,7 @@ static struct vport_ops *ovs_vport_lookup(const struct vport_parms *parms)
 {
 	struct vport_ops *ops;
 
-	list_for_each_entry(ops, &vport_ops_list, list)
-		if (ops->type == parms->type)
-			return ops;
+	list_for_each_entry(ops, &vport_ops_list, list) if (ops->type == parms->type) return ops;
 
 	return NULL;
 }
@@ -287,26 +294,31 @@ struct vport *ovs_vport_add(const struct vport_parms *parms)
 	struct vport_ops *ops;
 	struct vport *vport;
 
+	//xj:查找vport的操作
 	ops = ovs_vport_lookup(parms);
-	if (ops) {
+	if (ops)
+	{
 		struct hlist_head *bucket;
 
 		if (!try_module_get(ops->owner))
 			return ERR_PTR(-EAFNOSUPPORT);
 
+		//xj:委托ops创建vport
 		vport = ops->create(parms);
-		if (IS_ERR(vport)) {
+		if (IS_ERR(vport))
+		{
 			module_put(ops->owner);
 			return vport;
 		}
 
 		bucket = hash_bucket(ovs_dp_get_net(vport->dp),
-				     ovs_vport_name(vport));
+							 ovs_vport_name(vport));
 		hlist_add_head_rcu(&vport->hash_node, bucket);
 		return vport;
 	}
 
-	if (parms->type == OVS_VPORT_TYPE_GRE && !compat_gre_loaded) {
+	if (parms->type == OVS_VPORT_TYPE_GRE && !compat_gre_loaded)
+	{
 		pr_warn("GRE protocol already loaded!\n");
 		return ERR_PTR(-EAFNOSUPPORT);
 	}
@@ -373,14 +385,14 @@ void ovs_vport_get_stats(struct vport *vport, struct ovs_vport_stats *stats)
 	struct rtnl_link_stats64 temp;
 
 	dev_stats = dev_get_stats(vport->dev, &temp);
-	stats->rx_errors  = dev_stats->rx_errors;
-	stats->tx_errors  = dev_stats->tx_errors;
+	stats->rx_errors = dev_stats->rx_errors;
+	stats->tx_errors = dev_stats->tx_errors;
 	stats->tx_dropped = dev_stats->tx_dropped;
 	stats->rx_dropped = dev_stats->rx_dropped;
 
-	stats->rx_bytes	  = dev_stats->rx_bytes;
+	stats->rx_bytes = dev_stats->rx_bytes;
 	stats->rx_packets = dev_stats->rx_packets;
-	stats->tx_bytes	  = dev_stats->tx_bytes;
+	stats->tx_bytes = dev_stats->tx_bytes;
 	stats->tx_packets = dev_stats->tx_packets;
 }
 
@@ -413,7 +425,8 @@ int ovs_vport_get_options(const struct vport *vport, struct sk_buff *skb)
 		return -EMSGSIZE;
 
 	err = vport->ops->get_options(vport, skb);
-	if (err) {
+	if (err)
+	{
 		nla_nest_cancel(skb, nla);
 		return err;
 	}
@@ -445,7 +458,7 @@ int ovs_vport_set_upcall_portids(struct vport *vport, const struct nlattr *ids)
 	old = ovsl_dereference(vport->upcall_portids);
 
 	vport_portids = kmalloc(sizeof(*vport_portids) + nla_len(ids),
-				GFP_KERNEL);
+							GFP_KERNEL);
 	if (!vport_portids)
 		return -ENOMEM;
 
@@ -475,7 +488,7 @@ int ovs_vport_set_upcall_portids(struct vport *vport, const struct nlattr *ids)
  * ovs_mutex or rcu_read_lock.
  */
 int ovs_vport_get_upcall_portids(const struct vport *vport,
-				 struct sk_buff *skb)
+								 struct sk_buff *skb)
 {
 	struct vport_portids *ids;
 
@@ -483,7 +496,7 @@ int ovs_vport_get_upcall_portids(const struct vport *vport,
 
 	if (vport->dp->user_features & OVS_DP_F_VPORT_PIDS)
 		return nla_put(skb, OVS_VPORT_ATTR_UPCALL_PID,
-			       ids->n_ids * sizeof(u32), (void *)ids->ids);
+					   ids->n_ids * sizeof(u32), (void *)ids->ids);
 	else
 		return nla_put_u32(skb, OVS_VPORT_ATTR_UPCALL_PID, ids->ids[0]);
 }
@@ -516,6 +529,9 @@ u32 ovs_vport_find_upcall_portid(const struct vport *vport, struct sk_buff *skb)
 }
 
 /**
+ *  xj: vport接收数据包
+ * /
+/**
  *	ovs_vport_receive - pass up received packet to the datapath for processing
  *
  * @vport: vport that received the packet
@@ -526,7 +542,7 @@ u32 ovs_vport_find_upcall_portid(const struct vport *vport, struct sk_buff *skb)
  * skb->data should point to the Ethernet header.
  */
 int ovs_vport_receive(struct vport *vport, struct sk_buff *skb,
-		      const struct ip_tunnel_info *tun_info)
+					  const struct ip_tunnel_info *tun_info)
 {
 	struct sw_flow_key key;
 	int error;
@@ -534,7 +550,8 @@ int ovs_vport_receive(struct vport *vport, struct sk_buff *skb,
 	OVS_CB(skb)->input_vport = vport;
 	OVS_CB(skb)->mru = 0;
 	OVS_CB(skb)->cutlen = 0;
-	if (unlikely(dev_net(skb->dev) != ovs_dp_get_net(vport->dp))) {
+	if (unlikely(dev_net(skb->dev) != ovs_dp_get_net(vport->dp)))
+	{
 		u32 mark;
 
 		mark = skb->mark;
@@ -545,23 +562,27 @@ int ovs_vport_receive(struct vport *vport, struct sk_buff *skb,
 
 	ovs_skb_init_inner_protocol(skb);
 	skb_clear_ovs_gso_cb(skb);
+	/**
+	 * xj:从数据包提取flow_key数据
 	/* Extract flow from 'skb' into 'key'. */
 	error = ovs_flow_key_extract(tun_info, skb, &key);
-	if (unlikely(error)) {
+	if (unlikely(error))
+	{
 		kfree_skb(skb);
 		return error;
 	}
+	//xj:由datapath处理收到的数据包
 	ovs_dp_process_packet(skb, &key);
 	return 0;
 }
 
 static int packet_length(const struct sk_buff *skb,
-			 struct net_device *dev)
+						 struct net_device *dev)
 {
 	int length = skb->len - dev->hard_header_len;
 
 	if (!skb_vlan_tag_present(skb) &&
-	    eth_type_vlan(skb->protocol))
+		eth_type_vlan(skb->protocol))
 		length -= VLAN_HLEN;
 
 	/* Don't subtract for multiple VLAN tags. Most (all?) drivers allow
@@ -569,20 +590,24 @@ static int packet_length(const struct sk_buff *skb,
 	 * account for 802.1ad. e.g. is_skb_forwardable().
 	 */
 
-	return length > 0 ? length: 0;
+	return length > 0 ? length : 0;
 }
 
 void ovs_vport_send(struct vport *vport, struct sk_buff *skb, u8 mac_proto)
 {
 	int mtu = vport->dev->mtu;
 
-	switch (vport->dev->type) {
+	switch (vport->dev->type)
+	{
 	case ARPHRD_NONE:
-		if (mac_proto == MAC_PROTO_ETHERNET) {
+		if (mac_proto == MAC_PROTO_ETHERNET)
+		{
 			skb_reset_network_header(skb);
 			skb_reset_mac_len(skb);
 			skb->protocol = htons(ETH_P_TEB);
-		} else if (mac_proto != MAC_PROTO_NONE) {
+		}
+		else if (mac_proto != MAC_PROTO_NONE)
+		{
 			WARN_ON_ONCE(1);
 			goto drop;
 		}
@@ -596,10 +621,11 @@ void ovs_vport_send(struct vport *vport, struct sk_buff *skb, u8 mac_proto)
 	}
 
 	if (unlikely(packet_length(skb, vport->dev) > mtu &&
-		     !skb_is_gso(skb))) {
+				 !skb_is_gso(skb)))
+	{
 		net_warn_ratelimited("%s: dropped over-mtu packet: %d > %d\n",
-				     vport->dev->name,
-				     packet_length(skb, vport->dev), mtu);
+							 vport->dev->name,
+							 packet_length(skb, vport->dev), mtu);
 		vport->dev->stats.tx_errors++;
 		goto drop;
 	}

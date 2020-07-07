@@ -101,7 +101,7 @@ static inline int rpl_netdev_master_upper_dev_link(struct net_device *dev,
 {
 	return netdev_master_upper_dev_link(dev, upper_dev);
 }
-#define netdev_master_upper_dev_link rpl_netdev_master_upper_dev_link
+#define netdev_master_upper_dev_link rpl_nebtdev_master_upper_dev_link
 #else /* #ifndef HAVE_NETDEV_MASTER_UPPER_DEV_LINK_RH */
 static inline int rpl_netdev_master_upper_dev_link(struct net_device *dev,
 					       struct net_device *upper_dev,

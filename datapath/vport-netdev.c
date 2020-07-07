@@ -39,11 +39,13 @@
 
 static struct vport_ops ovs_netdev_vport_ops;
 
+//xj:处理vport关联netdev接收的数据包
 /* Must be called with rcu_read_lock. */
 void netdev_port_receive(struct sk_buff *skb, struct ip_tunnel_info *tun_info)
 {
 	struct vport *vport;
 
+	//xj:从数据包缓存关联设备上获取vport
 	vport = ovs_netdev_get_vport(skb->dev);
 	if (unlikely(!vport))
 		goto error;
@@ -51,6 +53,10 @@ void netdev_port_receive(struct sk_buff *skb, struct ip_tunnel_info *tun_info)
 	if (unlikely(skb_warn_if_lro(skb)))
 		goto error;
 
+	//xj:检查是否共享方式
+	// 1. 数据被保存在 skb->data 指向的由 kmalloc 申请的内存缓冲区中，这个数据区通常被称为线性数据区，数据区长度由函数 skb_headlen 给出
+	// 2. 数据被保存在紧随 skb 线性数据区尾部的共享结构体 skb_shared_info 中的成员 frags 所表示的内存页面中，skb_frag_t 的数目由 nr_frags 给出，skb_frags_t 中有数据在内存页面中的偏移量和数据区的大小
+	// 3. 数据被保存于 skb_shared_info 中的成员 frag_list 所表示的 skb 分片队列中
 	/* Make our own copy of the packet.  Otherwise we will mangle the
 	 * packet for anyone who came before us (e.g. tcpdump via AF_PACKET).
 	 */
@@ -58,25 +64,30 @@ void netdev_port_receive(struct sk_buff *skb, struct ip_tunnel_info *tun_info)
 	if (unlikely(!skb))
 		return;
 
-	if (skb->dev->type == ARPHRD_ETHER) {
+	if (skb->dev->type == ARPHRD_ETHER)
+	{
 		skb_push(skb, ETH_HLEN);
 		skb_postpush_rcsum(skb, skb->data, ETH_HLEN);
 	}
+	//xj:调用vport接收函数
 	ovs_vport_receive(vport, skb, tun_info);
 	return;
 error:
 	kfree_skb(skb);
 }
 
+//xj:ovs netdev数据包接收函数
 /* Called with rcu_read_lock and bottom-halves disabled. */
 static rx_handler_result_t netdev_frame_hook(struct sk_buff **pskb)
 {
-	struct sk_buff *skb = *pskb;
+	struct sk_buff *skb = *pskb; //xj:网络数据包缓存
 
+	//xj:不处理换回数据包
 	if (unlikely(skb->pkt_type == PACKET_LOOPBACK))
 		return RX_HANDLER_PASS;
 
 #ifndef USE_UPSTREAM_TUNNEL
+	//xj:从端口接收数据包
 	netdev_port_receive(skb, NULL);
 #else
 	netdev_port_receive(skb, skb_tunnel_info(skb));
@@ -93,37 +104,45 @@ static struct net_device *get_dpdev(const struct datapath *dp)
 	return local->dev;
 }
 
+//xj:给ovs网络设备注册rx_handler：netdev_frame_hook
 struct vport *ovs_netdev_link(struct vport *vport, const char *name)
 {
 	int err;
 
 	vport->dev = dev_get_by_name(ovs_dp_get_net(vport->dp), name);
-	if (!vport->dev) {
+	if (!vport->dev)
+	{
 		err = -ENODEV;
 		goto error_free_vport;
 	}
 
 	if (vport->dev->flags & IFF_LOOPBACK ||
-	    (vport->dev->type != ARPHRD_ETHER &&
-	     vport->dev->type != ARPHRD_NONE) ||
-	    ovs_is_internal_dev(vport->dev)) {
+		(vport->dev->type != ARPHRD_ETHER &&
+		 vport->dev->type != ARPHRD_NONE) ||
+		ovs_is_internal_dev(vport->dev))
+	{
 		err = -EINVAL;
 		goto error_put;
 	}
 
 	rtnl_lock();
-	err = netdev_master_upper_dev_link(vport->dev,
-					   get_dpdev(vport->dp),
-					   NULL, NULL, NULL);
+	//xj:获取上联设备？
+	err = netdev_master_upper_dev_link(vport->dev,			 //xj:vport关联的设备
+									   get_dpdev(vport->dp), //xj:vport所属datapath关联的设备
+									   NULL, NULL, NULL);
 	if (err)
 		goto error_unlock;
 
-	err = netdev_rx_handler_register(vport->dev, netdev_frame_hook,
-					 vport);
+	//xj:注册接收函数,调用linux系统函数给设备注册输入包处理函数netdev_frame_hook
+	err = netdev_rx_handler_register(vport->dev,		//xj：网络设备
+									 netdev_frame_hook, //xj:处理函数
+									 vport);			//xj:处理函数关联对象的指针
 	if (err)
 		goto error_master_upper_dev_unlink;
 
+	//xj:关闭Large Receive Offload
 	dev_disable_lro(vport->dev);
+	//xj:设置混杂模式
 	dev_set_promiscuity(vport->dev, 1);
 	vport->dev->priv_flags |= IFF_OVS_DATAPATH;
 	rtnl_unlock();
@@ -146,6 +165,7 @@ static struct vport *netdev_create(const struct vport_parms *parms)
 {
 	struct vport *vport;
 
+	//xj:创建netdev类型的vport
 	vport = ovs_vport_alloc(0, &ovs_netdev_vport_ops, parms);
 	if (IS_ERR(vport))
 		return vport;
@@ -168,7 +188,7 @@ void ovs_netdev_detach_dev(struct vport *vport)
 	vport->dev->priv_flags &= ~IFF_OVS_DATAPATH;
 	netdev_rx_handler_unregister(vport->dev);
 	netdev_upper_dev_unlink(vport->dev,
-				netdev_master_upper_dev_get(vport->dev));
+							netdev_master_upper_dev_get(vport->dev));
 	dev_set_promiscuity(vport->dev, -1);
 }
 
@@ -202,6 +222,7 @@ void ovs_netdev_tunnel_destroy(struct vport *vport)
 }
 EXPORT_SYMBOL_GPL(ovs_netdev_tunnel_destroy);
 
+//xj:获取net_device关联的vport，即net_device的rx_handler_data
 /* Returns null if this device is not attached to a datapath. */
 struct vport *ovs_netdev_get_vport(struct net_device *dev)
 {
@@ -213,14 +234,16 @@ struct vport *ovs_netdev_get_vport(struct net_device *dev)
 }
 
 static struct vport_ops ovs_netdev_vport_ops = {
-	.type		= OVS_VPORT_TYPE_NETDEV,
-	.create		= netdev_create,
-	.destroy	= netdev_destroy,
-	.send		= dev_queue_xmit,
+	.type = OVS_VPORT_TYPE_NETDEV,
+	.create = netdev_create,
+	.destroy = netdev_destroy,
+	.send = dev_queue_xmit,
 };
 
+//xj:初始化net_dev
 int __init ovs_netdev_init(void)
 {
+	//xj:注册vport_ops
 	return ovs_vport_ops_register(&ovs_netdev_vport_ops);
 }
 

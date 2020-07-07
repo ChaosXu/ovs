@@ -101,15 +101,7 @@ struct ovsdb_idl_column {
     void (*unparse)(struct ovsdb_idl_row *);
 };
 
-struct ovsdb_idl_table_class {
-    char *name;
-    bool is_root;
-    bool is_singleton;
-    const struct ovsdb_idl_column *columns;
-    size_t n_columns;
-    size_t allocation_size;
-    void (*row_init)(struct ovsdb_idl_row *);
-};
+ovs
 
 struct ovsdb_idl_table {
     const struct ovsdb_idl_table_class *class_;

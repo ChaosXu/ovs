@@ -115,7 +115,7 @@ struct port {
     struct ovs_list ifaces;    /* List of "struct iface"s. */
 };
 
-struct bridge {
+struct brbridge {
     struct hmap_node node;      /* In 'all_bridges'. */
     char *name;                 /* User-specified arbitrary name. */
     char *type;                 /* Datapath type. */
@@ -503,7 +503,6 @@ bridge_init(const char *remote)
     ovsdb_idl_omit(idl, &ovsrec_ipfix_col_external_ids);
     ovsdb_idl_omit(idl, &ovsrec_flow_sample_collector_set_col_external_ids);
 
-    ovsdb_idl_omit(idl, &ovsrec_manager_col_external_ids);
     ovsdb_idl_omit(idl, &ovsrec_manager_col_inactivity_probe);
     ovsdb_idl_omit(idl, &ovsrec_manager_col_is_connected);
     ovsdb_idl_omit(idl, &ovsrec_manager_col_max_backoff);
